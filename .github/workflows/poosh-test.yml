@@ -224,6 +224,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-branch
@@ -256,6 +260,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-nochange
@@ -286,6 +294,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create and push branch, then delete remotely
         run: |
           git checkout -b poosh/deleted-remote
@@ -319,6 +331,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create branch and open PR
         run: |
           git checkout -b poosh/pr-exists
@@ -355,6 +371,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create branch and open PR, then close PR
         run: |
           git checkout -b poosh/pr-closed
@@ -392,6 +412,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create branch and open PR, then merge and delete branch
         run: |
           git checkout -b poosh/pr-merged
@@ -539,6 +563,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set git user identity for test
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
       - name: Create non-poosh branch
         run: |
           git checkout -b collision-branch
