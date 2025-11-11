@@ -344,6 +344,8 @@ jobs:
           git push origin poosh/pr-exists
           # Open PR using GitHub CLI
           gh pr create --base master --head poosh/pr-exists --title "Poosh PR Exists" --body "Initial PR"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Make a new change
         run: echo "update $(date)" >> poosh-pr-exists.txt
       - name: Poosh (update existing PR)
@@ -385,6 +387,8 @@ jobs:
           gh pr create --base master --head poosh/pr-closed --title "Poosh PR Closed" --body "Initial PR"
           PR_NUMBER=$(gh pr list --head poosh/pr-closed --json number -q '.[0].number')
           gh pr close "$PR_NUMBER"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Make a new change
         run: echo "update $(date)" >> poosh-pr-closed.txt
       - name: Poosh (reopen or new PR)
@@ -427,6 +431,8 @@ jobs:
           PR_NUMBER=$(gh pr list --head poosh/pr-merged --json number -q '.[0].number')
           gh pr merge "$PR_NUMBER" --merge
           git push origin --delete poosh/pr-merged
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Make a new change
         run: echo "update $(date)" >> poosh-pr-merged.txt
       - name: Poosh (recreate branch after merge)
