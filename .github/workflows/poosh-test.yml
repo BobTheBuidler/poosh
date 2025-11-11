@@ -19,7 +19,7 @@ jobs:
         run: echo "test $(date)" >> poosh-testfile.txt
       - name: Poosh (push)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: push success"
           branch: "test-push"
@@ -41,7 +41,7 @@ jobs:
         run: echo "test $(date)" >> poosh-testfile.txt
       - name: Poosh (PR)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: pr success"
           branch: "test-pr"
@@ -67,7 +67,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Poosh (missing commit-message)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           branch: "test-error"
       - name: Assert failure
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Poosh (invalid branch)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: invalid branch"
           branch: "bad branch name!"
@@ -99,7 +99,7 @@ jobs:
         run: echo "test $(date)" >> poosh-testfile.txt
       - name: Poosh (missing triggers)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: warning missing triggers"
           branch: "test-warning"
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Poosh (no changes)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: no changes"
           branch: "test-no-changes"
@@ -137,7 +137,7 @@ jobs:
         run: echo "test $(date)" >> poosh-testfile.txt
       - name: Poosh (custom PR body)
         id: poosh
-        uses: ./actions/poosh
+        uses: ./
         with:
           commit-message: "test: custom pr body"
           branch: "test-custom-pr-body"
