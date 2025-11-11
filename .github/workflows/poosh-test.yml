@@ -1,9 +1,11 @@
 name: Test Poosh Action
 
 on:
-  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   # 1. Test: Successful push (push event)
