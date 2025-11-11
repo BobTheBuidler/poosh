@@ -228,6 +228,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/existing-branch || true
+          git push origin --delete poosh/existing-branch || true
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-branch
@@ -253,6 +257,10 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete poosh/existing-branch || true
 
   # 10. Test: Branch already exists with no changes (should not commit)
   branch-exists-no-changes:
@@ -264,6 +272,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/existing-nochange || true
+          git push origin --delete poosh/existing-nochange || true
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-nochange
@@ -287,6 +299,10 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete poosh/existing-nochange || true
 
   # 11. Test: Branch was deleted remotely (should handle gracefully and recreate if needed)
   branch-deleted-remotely:
@@ -298,6 +314,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/deleted-remote || true
+          git push origin --delete poosh/deleted-remote || true
       - name: Create and push branch, then delete remotely
         run: |
           git checkout -b poosh/deleted-remote
@@ -324,6 +344,10 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete poosh/deleted-remote || true
 
   # 12. Test: PR already exists for the branch (should update PR, not create duplicate)
   pr-already-exists:
@@ -335,6 +359,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/pr-exists || true
+          git push origin --delete poosh/pr-exists || true
       - name: Create branch and open PR
         run: |
           git checkout -b poosh/pr-exists
@@ -366,6 +394,10 @@ jobs:
             echo "No PR was created, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete poosh/pr-exists || true
 
   # 13. Test: PR closed without merge (should allow re-opening or new PR)
   pr-closed-no-merge:
@@ -377,6 +409,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/pr-closed || true
+          git push origin --delete poosh/pr-closed || true
       - name: Create branch and open PR, then close PR
         run: |
           git checkout -b poosh/pr-closed
@@ -409,6 +445,10 @@ jobs:
             echo "No PR was created, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete poosh/pr-closed || true
 
   # 14. Test: PR merged and branch deleted (should recreate branch if needed)
   pr-merged-branch-deleted:
@@ -420,6 +460,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D poosh/pr-merged || true
+          git push origin --delete poosh/pr-merged || true
       - name: Create branch and open PR, then merge and delete branch
         run: |
           git checkout -b poosh/pr-merged
@@ -451,6 +495,9 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: git push origin --delete poosh/pr-merged || true
 
   # 15. Test: Action run with no git user config (should set it automatically)
   no-git-user-config:
@@ -573,6 +620,10 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Clean up test branch locally and remotely if exists
+        run: |
+          git branch -D collision-branch || true
+          git push origin --delete collision-branch || true
       - name: Create non-poosh branch
         run: |
           git checkout -b collision-branch
@@ -597,6 +648,10 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
+      - name: Cleanup remote branch after test
+        if: always()
+        run: |
+          git push origin --delete collision-branch || true
 
   # 20. Test: Invalid input combinations (both triggers missing, should warn but not error)
   missing-triggers-warning:
