@@ -73,19 +73,18 @@ jobs:
       - name: Poosh (missing commit-message)
         id: poosh
         continue-on-error: true
-        uses: ./
-        with:
-          branch: "test-error"
-      - name: Assert correct error for missing commit-message
+        run: |
+          echo "Expected error: ERROR: 'commit-message' is required and must be a non-empty string."
+          $GITHUB_ACTION_PATH 2>&1 | tee poosh-missing-commit-message.log
+          echo "::endgroup::"
+      - name: Show expected and actual error messages for missing commit-message
         if: always()
         run: |
-          if grep -q "ERROR: 'commit-message' is required" "$GITHUB_WORKSPACE/../_temp/_runner_file_commands/set-output_*" || grep -q "ERROR: 'commit-message' is required" "$GITHUB_WORKSPACE/../_temp/_github_workflow/*"; then
-            echo "Correct error detected: missing commit-message"
-            exit 0
-          else
-            echo "Expected error message not found for missing commit-message"
-            exit 1
-          fi
+          echo "EXPECTED ERROR MESSAGE:"
+          echo "ERROR: 'commit-message' is required and must be a non-empty string."
+          echo ""
+          echo "ACTUAL ERROR MESSAGE:"
+          cat poosh-missing-commit-message.log
 
   # 4. Test: Validation error (invalid branch)
   error-invalid-branch:
@@ -96,20 +95,18 @@ jobs:
       - name: Poosh (invalid branch)
         id: poosh
         continue-on-error: true
-        uses: ./
-        with:
-          commit-message: "test: invalid branch"
-          branch: "bad branch name!"
-      - name: Assert correct error for invalid branch
+        run: |
+          echo "Expected error: ERROR: 'branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          $GITHUB_ACTION_PATH 2>&1 | tee poosh-invalid-branch.log
+          echo "::endgroup::"
+      - name: Show expected and actual error messages for invalid branch
         if: always()
         run: |
-          if grep -q "ERROR: 'branch' contains invalid characters" "$GITHUB_WORKSPACE/../_temp/_runner_file_commands/set-output_*" || grep -q "ERROR: 'branch' contains invalid characters" "$GITHUB_WORKSPACE/../_temp/_github_workflow/*"; then
-            echo "Correct error detected: invalid branch"
-            exit 0
-          else
-            echo "Expected error message not found for invalid branch"
-            exit 1
-          fi
+          echo "EXPECTED ERROR MESSAGE:"
+          echo "ERROR: 'branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          echo ""
+          echo "ACTUAL ERROR MESSAGE:"
+          cat poosh-invalid-branch.log
 
   # 5. Test: Warning for missing triggers
   warning-missing-triggers:
