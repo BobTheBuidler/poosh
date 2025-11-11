@@ -467,7 +467,7 @@ jobs:
       - name: Create branch and open PR, then merge and delete branch
         run: |
           git checkout -b poosh/pr-merged
-          echo "initial" > poosh-pr-merged.txt
+          echo "$(date)" > poosh-pr-merged.txt
           git add poosh-pr-merged.txt
           git commit -m "initial commit"
           git push origin poosh/pr-merged
