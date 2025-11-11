@@ -280,7 +280,7 @@ jobs:
         run: |
           git checkout -b poosh/existing-nochange
           echo "initial" > poosh-existing-$(date +%s)-nochange-$(date +%s).txt
-          git add poosh-existing-$(date +%s)-nochange-$(date +%s).txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/existing-nochange
       - name: Poosh (no changes on existing branch)
@@ -321,13 +321,13 @@ jobs:
       - name: Create and push branch, then delete remotely
         run: |
           git checkout -b poosh/deleted-remote
-          echo "initial" > poosh-deleted-remote.txt
-          git add poosh-deleted-remote.txt
+          echo "initial" > poosh-deleted-remote-$(date +%s).txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/deleted-remote
           git push origin --delete poosh/deleted-remote
       - name: Make a new change
-        run: echo "update $(date)" >> poosh-deleted-remote.txt
+        run: echo "update $(date)" >> poosh-deleted-remote-$(date +%s).txt
       - name: Poosh (recreate deleted branch)
         id: poosh
         uses: ./
@@ -363,15 +363,23 @@ jobs:
         run: |
           git branch -D poosh/pr-exists || true
           git push origin --delete poosh/pr-exists || true
+      - name: Clean up test runner branch locally and remotely if exists
+        run: |
+          git branch -D test-runner-branch-pr-exists || true
+          git push origin --delete test-runner-branch-pr-exists || true
+      - name: Create test runner branch
+        run: |
+          git checkout -b test-runner-branch-pr-exists
+          git push origin test-runner-branch-pr-exists
       - name: Create branch and open PR
         run: |
-          git checkout -b poosh/pr-exists
-          echo "initial" > poosh-pr-exists.txt
-          git add poosh-pr-exists.txt
+          git checkout -b poosh/pr-exists test-runner-branch-pr-exists
+          echo "initial" > poosh-pr-exists-$(date +%s).txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/pr-exists
           # Open PR using GitHub CLI
-          gh pr create --base master --head poosh/pr-exists --title "Poosh PR Exists" --body "Initial PR"
+          gh pr create --base test-runner-branch-pr-exists --head poosh/pr-exists --title "Poosh PR Exists" --body "Initial PR"
         env:
           GH_TOKEN: ${{ github.token }}
       - name: Make a new change
@@ -394,10 +402,11 @@ jobs:
             echo "No PR was created, outputs are empty as expected."
             exit 0
           fi
-      - name: Cleanup remote branch after test
+      - name: Cleanup remote branches after test
         if: always()
         run: |
           git push origin --delete poosh/pr-exists || true
+          git push origin --delete test-runner-branch-pr-exists || true
 
   # 13. Test: PR closed without merge (should allow re-opening or new PR)
   pr-closed-no-merge:
@@ -413,14 +422,22 @@ jobs:
         run: |
           git branch -D poosh/pr-closed || true
           git push origin --delete poosh/pr-closed || true
+      - name: Clean up test runner branch locally and remotely if exists
+        run: |
+          git branch -D test-runner-branch-pr-closed || true
+          git push origin --delete test-runner-branch-pr-closed || true
+      - name: Create test runner branch
+        run: |
+          git checkout -b test-runner-branch-pr-closed
+          git push origin test-runner-branch-pr-closed
       - name: Create branch and open PR, then close PR
         run: |
-          git checkout -b poosh/pr-closed
-          echo "initial" > poosh-pr-closed.txt
-          git add poosh-pr-closed.txt
+          git checkout -b poosh/pr-closed test-runner-branch-pr-closed
+          echo "initial" > poosh-pr-closed-$(date +%s).txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/pr-closed
-          gh pr create --base master --head poosh/pr-closed --title "Poosh PR Closed" --body "Initial PR"
+          gh pr create --base test-runner-branch-pr-closed --head poosh/pr-closed --title "Poosh PR Closed" --body "Initial PR"
           PR_NUMBER=$(gh pr list --head poosh/pr-closed --json number -q '.[0].number')
           gh pr close "$PR_NUMBER"
         env:
@@ -445,10 +462,11 @@ jobs:
             echo "No PR was created, outputs are empty as expected."
             exit 0
           fi
-      - name: Cleanup remote branch after test
+      - name: Cleanup remote branches after test
         if: always()
         run: |
           git push origin --delete poosh/pr-closed || true
+          git push origin --delete test-runner-branch-pr-closed || true
 
   # 14. Test: PR merged and branch deleted (should recreate branch if needed)
   pr-merged-branch-deleted:
@@ -460,18 +478,24 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Clean up test branch locally and remotely if exists
+      - name: Clean up test branches locally and remotely if exists
         run: |
           git branch -D poosh/pr-merged || true
           git push origin --delete poosh/pr-merged || true
+          git branch -D test-runner-branch || true
+          git push origin --delete test-runner-branch || true
+      - name: Create test runner branch
+        run: |
+          git checkout -b test-runner-branch
+          git push origin test-runner-branch
       - name: Create branch and open PR, then merge and delete branch
         run: |
-          git checkout -b poosh/pr-merged
-          echo "$(date)" > poosh-pr-merged.txt
-          git add poosh-pr-merged.txt
+          git checkout -b poosh/pr-merged test-runner-branch
+          echo "$(date)" > poosh-pr-merged-$(date +%s).txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/pr-merged
-          gh pr create --base master --head poosh/pr-merged --title "Poosh PR Merged" --body "Initial PR"
+          gh pr create --base test-runner-branch --head poosh/pr-merged --title "Poosh PR Merged" --body "Initial PR"
           PR_NUMBER=$(gh pr list --head poosh/pr-merged --json number -q '.[0].number')
           gh pr merge "$PR_NUMBER" --merge
           git push origin --delete poosh/pr-merged
@@ -495,9 +519,11 @@ jobs:
             echo "No commit or push occurred, outputs are empty as expected."
             exit 0
           fi
-      - name: Cleanup remote branch after test
+      - name: Cleanup remote branches after test
         if: always()
-        run: git push origin --delete poosh/pr-merged || true
+        run: |
+          git push origin --delete poosh/pr-merged || true
+          git push origin --delete test-runner-branch || true
 
   # 15. Test: Action run with no git user config (should set it automatically)
   no-git-user-config:
@@ -591,8 +617,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Stage changes
         run: |
-          echo "staged change" > poosh-staged.txt
-          git add poosh-staged.txt
+          echo "staged change" > poosh-staged-$(date +%s).txt
+          git add .
       - name: Poosh (staged but uncommitted)
         id: poosh
         uses: ./
@@ -627,8 +653,8 @@ jobs:
       - name: Create non-poosh branch
         run: |
           git checkout -b collision-branch
-          echo "collision" > poosh-collision.txt
-          git add poosh-collision.txt
+          echo "collision" > poosh-collision-$(date +%s).txt
+          git add .
           git commit -m "collision branch"
           git push origin collision-branch
       - name: Poosh (branch name collision)
