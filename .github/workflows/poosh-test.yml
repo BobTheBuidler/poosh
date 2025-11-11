@@ -1,0 +1,150 @@
+name: Test Poosh Action
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  # 1. Test: Successful push (push event)
+  push-success:
+    name: Push Success (push event)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a change
+        run: echo "test $(date)" >> poosh-testfile.txt
+      - name: Poosh (push)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: push success"
+          branch: "test-push"
+      - name: Assert outputs
+        run: |
+          echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+          test -n "${{ steps.poosh.outputs.branch }}"
+          test -n "${{ steps.poosh.outputs.commit-sha }}"
+
+  # 2. Test: Successful PR (pull_request event)
+  pr-success:
+    name: PR Success (pull_request event)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a change
+        run: echo "test $(date)" >> poosh-testfile.txt
+      - name: Poosh (PR)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: pr success"
+          branch: "test-pr"
+          trigger-pr-number: ${{ github.event.pull_request.number }}
+          trigger-branch-name: ${{ github.head_ref || github.ref_name }}
+      - name: Assert outputs
+        run: |
+          echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+          echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
+          echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
+          test -n "${{ steps.poosh.outputs.branch }}"
+          test -n "${{ steps.poosh.outputs.commit-sha }}"
+          test -n "${{ steps.poosh.outputs.pr-url }}"
+          test -n "${{ steps.poosh.outputs.pr-number }}"
+
+  # 3. Test: Validation error (missing commit-message)
+  error-missing-commit-message:
+    name: Error - Missing Commit Message
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poosh (missing commit-message)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          branch: "test-error"
+      - name: Assert failure
+        run: echo "Should have failed due to missing commit-message"
+
+  # 4. Test: Validation error (invalid branch)
+  error-invalid-branch:
+    name: Error - Invalid Branch
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poosh (invalid branch)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: invalid branch"
+          branch: "bad branch name!"
+      - name: Assert failure
+        run: echo "Should have failed due to invalid branch name"
+
+  # 5. Test: Warning for missing triggers
+  warning-missing-triggers:
+    name: Warning - Missing Triggers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a change
+        run: echo "test $(date)" >> poosh-testfile.txt
+      - name: Poosh (missing triggers)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: warning missing triggers"
+          branch: "test-warning"
+      - name: Assert outputs
+        run: |
+          echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+
+  # 6. Test: No changes (should not push or PR)
+  no-changes:
+    name: No Changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poosh (no changes)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: no changes"
+          branch: "test-no-changes"
+      - name: Assert outputs
+        run: |
+          echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+          echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
+          echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
+
+  # 7. Test: Custom PR body
+  custom-pr-body:
+    name: Custom PR Body
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a change
+        run: echo "test $(date)" >> poosh-testfile.txt
+      - name: Poosh (custom PR body)
+        id: poosh
+        uses: ./actions/poosh
+        with:
+          commit-message: "test: custom pr body"
+          branch: "test-custom-pr-body"
+          pr-body: |
+            This PR is a custom test for Poosh.
+            Triggered by workflow_dispatch.
+      - name: Assert outputs
+        run: |
+          echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+          echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
+          echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
