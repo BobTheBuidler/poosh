@@ -686,7 +686,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: branch name collision"
-          branch: "collision-branch"
+          trigger-branch: "collision-branch"
       - name: Assert outputs
         run: |
           # Should not overwrite non-poosh branch, so outputs should be empty
@@ -716,7 +716,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: missing triggers warning"
-          branch: "missing-triggers-warning"
+          trigger-branch: "missing-triggers-warning"
       - name: Assert outputs
         run: |
           if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
