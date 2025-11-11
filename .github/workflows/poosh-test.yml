@@ -235,12 +235,12 @@ jobs:
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-branch
-          echo "initial" > poosh-existing-$(date +%s).txt
-          git add poosh-existing-$(date +%s).txt
+          echo "initial" > poosh-existing-test.txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/existing-branch
       - name: Make a new change
-        run: echo "update $(date)" >> poosh-existing-$(date +%s).txt
+        run: echo "update $(date)" >> poosh-existing-test.txt
       - name: Poosh (update existing branch)
         id: poosh
         uses: ./
