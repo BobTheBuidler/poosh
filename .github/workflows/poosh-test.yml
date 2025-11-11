@@ -22,11 +22,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: push success"
-          branch: "test-push"
+          trigger-branch: "test-push"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -34,27 +34,26 @@ jobs:
             exit 0
           fi
 
-  # 2. Test: Successful PR (pull_request event)
-  pr-success:
-    name: PR Success (pull_request event)
+  # 2. Test: Successful PR (pull_request event, default pr-branch)
+  pr-success-default:
+    name: PR Success (pull_request event, default pr-branch)
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - name: Make a change
         run: echo "test $(date)" >> poosh-testfile.txt
-      - name: Poosh (PR)
+      - name: Poosh (PR, default pr-branch)
         id: poosh
         uses: ./
         with:
-          commit-message: "test: pr success"
-          branch: "test-pr"
+          commit-message: "test: pr success (default pr-branch)"
+          trigger-branch: "test-pr"
           trigger-pr-number: ${{ github.event.pull_request.number }}
-          trigger-branch-name: ${{ github.head_ref || github.ref_name }}
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
             echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
@@ -64,7 +63,37 @@ jobs:
             exit 0
           fi
 
-  # 3. Test: Validation error (missing commit-message)
+  # 3. Test: Successful PR (pull_request event, custom pr-branch)
+  pr-success-custom:
+    name: PR Success (pull_request event, custom pr-branch)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a change
+        run: echo "test $(date)" >> poosh-testfile.txt
+      - name: Poosh (PR, custom pr-branch)
+        id: poosh
+        uses: ./
+        with:
+          commit-message: "test: pr success (custom pr-branch)"
+          trigger-branch: "test-pr-custom"
+          pr-branch: "poosh/custom-artifacts"
+          trigger-pr-number: ${{ github.event.pull_request.number }}
+      - name: Assert outputs
+        run: |
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
+            echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
+            echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
+            echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
+            exit 0
+          else
+            echo "No PR was created, outputs are empty as expected."
+            exit 0
+          fi
+
+  # 4. Test: Validation error (missing commit-message)
   error-missing-commit-message:
     name: Error - Missing Commit Message
     runs-on: ubuntu-latest
@@ -86,29 +115,51 @@ jobs:
           echo "ACTUAL ERROR MESSAGE:"
           cat poosh-missing-commit-message.log
 
-  # 4. Test: Validation error (invalid branch)
-  error-invalid-branch:
-    name: Error - Invalid Branch
+  # 5. Test: Validation error (invalid trigger-branch)
+  error-invalid-trigger-branch:
+    name: Error - Invalid Trigger Branch
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Poosh (invalid branch)
+      - name: Poosh (invalid trigger-branch)
         id: poosh
         continue-on-error: true
         run: |
-          echo "Expected error: ERROR: 'branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
-          $GITHUB_ACTION_PATH 2>&1 | tee poosh-invalid-branch.log
+          echo "Expected error: ERROR: 'trigger-branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          $GITHUB_ACTION_PATH 2>&1 | tee poosh-invalid-trigger-branch.log
           echo "::endgroup::"
-      - name: Show expected and actual error messages for invalid branch
+      - name: Show expected and actual error messages for invalid trigger-branch
         if: always()
         run: |
           echo "EXPECTED ERROR MESSAGE:"
-          echo "ERROR: 'branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          echo "ERROR: 'trigger-branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
           echo ""
           echo "ACTUAL ERROR MESSAGE:"
-          cat poosh-invalid-branch.log
+          cat poosh-invalid-trigger-branch.log
 
-  # 5. Test: Warning for missing triggers
+  # 6. Test: Validation error (invalid pr-branch)
+  error-invalid-pr-branch:
+    name: Error - Invalid PR Branch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Poosh (invalid pr-branch)
+        id: poosh
+        continue-on-error: true
+        run: |
+          echo "Expected error: ERROR: 'pr-branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          $GITHUB_ACTION_PATH 2>&1 | tee poosh-invalid-pr-branch.log
+          echo "::endgroup::"
+      - name: Show expected and actual error messages for invalid pr-branch
+        if: always()
+        run: |
+          echo "EXPECTED ERROR MESSAGE:"
+          echo "ERROR: 'pr-branch' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          echo ""
+          echo "ACTUAL ERROR MESSAGE:"
+          cat poosh-invalid-pr-branch.log
+
+  # 7. Test: Warning for missing triggers
   warning-missing-triggers:
     name: Warning - Missing Triggers
     runs-on: ubuntu-latest
@@ -121,11 +172,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: warning missing triggers"
-          branch: "test-warning"
+          trigger-branch: "test-warning"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -133,7 +184,7 @@ jobs:
             exit 0
           fi
 
-  # 6. Test: No changes (should not push or PR)
+  # 8. Test: No changes (should not push or PR)
   no-changes:
     name: No Changes
     runs-on: ubuntu-latest
@@ -144,11 +195,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: no changes"
-          branch: "test-no-changes"
+          trigger-branch: "test-no-changes"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -156,7 +207,7 @@ jobs:
             exit 0
           fi
 
-  # 7. Test: Custom PR body (with triggers)
+  # 9. Test: Custom PR body (with triggers)
   custom-pr-body-with-triggers:
     name: Custom PR Body (with triggers)
     runs-on: ubuntu-latest
@@ -169,16 +220,16 @@ jobs:
         uses: ./
         with:
           commit-message: "test: custom pr body with triggers"
-          branch: "test-custom-pr-body-triggers"
-          pr-body: |
-            This PR is a custom test for Poosh.
-            Triggered by workflow_dispatch.
+          
+          pr-branch: "poosh/custom-pr-body"
+          
           trigger-pr-number: 1234
-          trigger-branch-name: "feature/test"
+          trigger-branch: "test-custom-pr-body-triggers"
+          pr-body: This PR is a custom test for Poosh.
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
             echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
@@ -188,7 +239,7 @@ jobs:
             exit 0
           fi
 
-  # 8. Test: Custom PR body (without triggers)
+  # 10. Test: Custom PR body (without triggers)
   custom-pr-body-no-triggers:
     name: Custom PR Body (no triggers)
     runs-on: ubuntu-latest
@@ -201,14 +252,13 @@ jobs:
         uses: ./
         with:
           commit-message: "test: custom pr body no triggers"
-          branch: "test-custom-pr-body-no-triggers"
-          pr-body: |
-            This PR is a custom test for Poosh.
-            No triggers provided.
+          trigger-branch: "test-custom-pr-body-no-triggers"
+          pr-branch: "poosh/custom-pr-body-no-triggers"
+          pr-body: This PR is a custom test for Poosh.
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
             echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
@@ -218,7 +268,7 @@ jobs:
             exit 0
           fi
 
-  # 9. Test: Branch already exists with changes (should update branch)
+  # 11. Test: Branch already exists with changes (should update branch)
   branch-exists-with-changes:
     name: Branch Exists With Changes
     runs-on: ubuntu-latest
@@ -246,11 +296,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: update existing branch"
-          branch: "existing-branch"
+          trigger-branch: "existing-branch"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -262,7 +312,7 @@ jobs:
         run: |
           git push origin --delete poosh/existing-branch || true
 
-  # 10. Test: Branch already exists with no changes (should not commit)
+  # 12. Test: Branch already exists with no changes (should not commit)
   branch-exists-no-changes:
     name: Branch Exists No Changes
     runs-on: ubuntu-latest
@@ -288,11 +338,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: no changes on existing branch"
-          branch: "existing-nochange"
+          trigger-branch: "existing-nochange"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -304,7 +354,7 @@ jobs:
         run: |
           git push origin --delete poosh/existing-nochange || true
 
-  # 11. Test: Branch was deleted remotely (should handle gracefully and recreate if needed)
+  # 13. Test: Branch was deleted remotely (should handle gracefully and recreate if needed)
   branch-deleted-remotely:
     name: Branch Deleted Remotely
     runs-on: ubuntu-latest
@@ -333,11 +383,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: recreate deleted branch"
-          branch: "deleted-remote"
+          trigger-branch: "deleted-remote"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -349,7 +399,7 @@ jobs:
         run: |
           git push origin --delete poosh/deleted-remote || true
 
-  # 12. Test: PR already exists for the branch (should update PR, not create duplicate)
+  # 14. Test: PR already exists for the branch (should update PR, not create duplicate)
   pr-already-exists:
     name: PR Already Exists For Branch
     runs-on: ubuntu-latest
@@ -381,11 +431,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: update existing PR"
-          branch: "pr-exists"
+          trigger-branch: "pr-exists"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
             echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
@@ -399,7 +449,7 @@ jobs:
         run: |
           git push origin --delete poosh/pr-exists || true
 
-  # 13. Test: PR closed without merge (should allow re-opening or new PR)
+  # 15. Test: PR closed without merge (should allow re-opening or new PR)
   pr-closed-no-merge:
     name: PR Closed Without Merge
     runs-on: ubuntu-latest
@@ -432,11 +482,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: reopen or new PR"
-          branch: "pr-closed"
+          trigger-branch: "pr-closed"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             echo "PR URL: ${{ steps.poosh.outputs.pr-url }}"
             echo "PR Number: ${{ steps.poosh.outputs.pr-number }}"
@@ -450,7 +500,7 @@ jobs:
         run: |
           git push origin --delete poosh/pr-closed || true
 
-  # 14. Test: PR merged and branch deleted (should recreate branch if needed)
+  # 16. Test: PR merged and branch deleted (should recreate branch if needed)
   pr-merged-branch-deleted:
     name: PR Merged and Branch Deleted
     runs-on: ubuntu-latest
@@ -484,11 +534,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: recreate branch after merge"
-          branch: "pr-merged"
+          trigger-branch: "pr-merged"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -499,7 +549,7 @@ jobs:
         if: always()
         run: git push origin --delete poosh/pr-merged || true
 
-  # 15. Test: Action run with no git user config (should set it automatically)
+  # 17. Test: Action run with no git user config (should set it automatically)
   no-git-user-config:
     name: No Git User Config
     runs-on: ubuntu-latest
@@ -516,11 +566,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: no git user config"
-          branch: "no-git-user"
+          trigger-branch: "no-git-user"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -528,7 +578,7 @@ jobs:
             exit 0
           fi
 
-  # 16. Test: Action run in a detached HEAD state (should handle gracefully)
+  # 18. Test: Action run in a detached HEAD state (should handle gracefully)
   detached-head:
     name: Detached HEAD State
     runs-on: ubuntu-latest
@@ -546,11 +596,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: detached HEAD"
-          branch: "detached-head"
+          trigger-branch: "detached-head"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -558,7 +608,7 @@ jobs:
             exit 0
           fi
 
-  # 17. Test: Only untracked files (should not commit)
+  # 19. Test: Only untracked files (should not commit)
   only-untracked-files:
     name: Only Untracked Files
     runs-on: ubuntu-latest
@@ -571,11 +621,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: only untracked files"
-          branch: "only-untracked"
+          trigger-branch: "only-untracked"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -583,7 +633,7 @@ jobs:
             exit 0
           fi
 
-  # 18. Test: Staged but uncommitted changes before action runs (should commit all changes)
+  # 20. Test: Staged but uncommitted changes before action runs (should commit all changes)
   staged-uncommitted-changes:
     name: Staged But Uncommitted Changes
     runs-on: ubuntu-latest
@@ -598,11 +648,11 @@ jobs:
         uses: ./
         with:
           commit-message: "test: staged but uncommitted"
-          branch: "staged-uncommitted"
+          trigger-branch: "staged-uncommitted"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
@@ -640,8 +690,8 @@ jobs:
       - name: Assert outputs
         run: |
           # Should not overwrite non-poosh branch, so outputs should be empty
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 1
           else
@@ -669,8 +719,8 @@ jobs:
           branch: "missing-triggers-warning"
       - name: Assert outputs
         run: |
-          if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
-            echo "Branch: ${{ steps.poosh.outputs.branch }}"
+          if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
+            echo "Branch: ${{ steps.poosh.outputs.trigger-branch }}"
             echo "Commit SHA: ${{ steps.poosh.outputs.commit-sha }}"
             exit 0
           else
