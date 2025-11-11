@@ -235,12 +235,12 @@ jobs:
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-branch
-          echo "initial" > poosh-existing.txt
-          git add poosh-existing.txt
+          echo "initial" > poosh-existing-$(date +%s).txt
+          git add poosh-existing-$(date +%s).txt
           git commit -m "initial commit"
           git push origin poosh/existing-branch
       - name: Make a new change
-        run: echo "update $(date)" >> poosh-existing.txt
+        run: echo "update $(date)" >> poosh-existing-$(date +%s).txt
       - name: Poosh (update existing branch)
         id: poosh
         uses: ./
@@ -279,8 +279,8 @@ jobs:
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-nochange
-          echo "initial" > poosh-existing-nochange.txt
-          git add poosh-existing-nochange.txt
+          echo "initial" > poosh-existing-$(date +%s)-nochange-$(date +%s).txt
+          git add poosh-existing-$(date +%s)-nochange-$(date +%s).txt
           git commit -m "initial commit"
           git push origin poosh/existing-nochange
       - name: Poosh (no changes on existing branch)
