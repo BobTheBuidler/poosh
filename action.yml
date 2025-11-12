@@ -49,13 +49,6 @@ runs:
         fi
       shell: bash
 
-    - name: Validate triggers
-      run: |
-        if [[ -z "${{ inputs.trigger-pr-number }}" && -z "${{ inputs.trigger-branch-name }}" ]]; then
-          echo "::warning::Neither 'trigger-pr-number' nor 'trigger-branch-name' was set. PR body will not include a trigger reference."
-        fi
-      shell: bash
-
     - name: Set poosh branch name
       id: poosh_branch
       run: |
@@ -97,6 +90,13 @@ runs:
         git commit -m "${{ inputs.commit-message }}"
         git push origin "${{ steps.poosh_branch.outputs.branch }}"
         echo "commit-sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Validate triggers
+      run: |
+        if [[ -z "${{ inputs.trigger-pr-number }}" && -z "${{ inputs.trigger-branch-name }}" ]]; then
+          echo "::warning::Neither 'trigger-pr-number' nor 'trigger-branch-name' was set. PR body will not include a trigger reference."
+        fi
       shell: bash
 
     - name: Create Pull Request
