@@ -220,9 +220,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: custom pr body with triggers"
-          
           pr-branch: "poosh/custom-pr-body"
-          
           trigger-pr-number: 1234
           trigger-branch: "test-custom-pr-body-triggers"
           pr-body: This PR is a custom test for Poosh.
@@ -338,7 +336,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: no changes on existing branch"
-          trigger-branch: "existing-nochange"
+          trigger-branch: "poosh/existing-nochange"
       - name: Assert outputs
         run: |
           if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
@@ -499,7 +497,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: reopen or new PR"
-          trigger-branch: "pr-closed"
+          trigger-branch: "poosh/pr-closed"
       - name: Assert outputs
         run: |
           if [ -n "${{ steps.poosh.outputs.trigger-branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ] && [ -n "${{ steps.poosh.outputs.pr-url }}" ] && [ -n "${{ steps.poosh.outputs.pr-number }}" ]; then
