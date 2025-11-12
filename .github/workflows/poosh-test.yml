@@ -235,18 +235,18 @@ jobs:
       - name: Create branch and push initial commit
         run: |
           git checkout -b poosh/existing-branch
-          echo "initial" > poosh-existing-$(date +%s).txt
-          git add poosh-existing-$(date +%s).txt
+          echo "initial" > poosh-existing-test.txt
+          git add .
           git commit -m "initial commit"
           git push origin poosh/existing-branch
       - name: Make a new change
-        run: echo "update $(date)" >> poosh-existing-$(date +%s).txt
+        run: echo "update $(date)" >> poosh-existing-test.txt
       - name: Poosh (update existing branch)
         id: poosh
         uses: ./
         with:
           commit-message: "test: update existing branch"
-          branch: "existing-branch"
+          branch: "poosh/existing-branch"
       - name: Assert outputs
         run: |
           if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
@@ -467,7 +467,7 @@ jobs:
       - name: Create branch and open PR, then merge and delete branch
         run: |
           git checkout -b poosh/pr-merged
-          echo "initial" > poosh-pr-merged.txt
+          echo "$(date)" > poosh-pr-merged.txt
           git add poosh-pr-merged.txt
           git commit -m "initial commit"
           git push origin poosh/pr-merged
