@@ -246,7 +246,7 @@ jobs:
         uses: ./
         with:
           commit-message: "test: update existing branch"
-          branch: "existing-branch"
+          branch: "poosh/existing-branch"
       - name: Assert outputs
         run: |
           if [ -n "${{ steps.poosh.outputs.branch }}" ] && [ -n "${{ steps.poosh.outputs.commit-sha }}" ]; then
