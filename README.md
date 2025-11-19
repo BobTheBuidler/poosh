@@ -4,33 +4,31 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 
 ## Features
 
-- Commits and pushes changes to a user-configurable branch (always prefixed with `poosh/`)
+- Commits and pushes changes to a user-configurable branch (the branch where changes were made)
 - On push events, pushes directly to the branch
-- On other events, opens a pull request from the branch
+- If direct push is not possible, opens a pull request from a configurable or default branch (see `pr-branch` logic)
 - PR title is always set to the commit message
 - PR branch is always deleted after merge/close (`delete-branch: true`)
-- PR body can be customized via the `pr-body` input, or defaults to a standard message
 - Robust input validation and clear warnings
-- Outputs branch name, commit SHA, PR URL, and PR number
+- Outputs target branch name, commit SHA, PR URL, and PR number
 
 ## Inputs
 
-| Name                  | Description                                                                 | Required | Default |
-|-----------------------|-----------------------------------------------------------------------------|----------|---------|
-| `commit-message`      | Commit message to use when committing changes.                              | Yes      |         |
-| `branch`              | Suffix for the branch to push/PR to. The branch will always be `poosh/{branch}`. | Yes      |         |
-| `trigger-pr-number`   | PR number of the triggering PR (for PR body).                               | No       |         |
-| `trigger-branch-name` | Name of the triggering branch (for PR body if no PR number).                | No       |         |
-| `pr-body`             | Custom body for the pull request. If not set, a default body is used.       | No       |         |
+| Name               | Description                                                                                                    | Required | Default                |
+|--------------------|----------------------------------------------------------------------------------------------------------------|----------|------------------------|
+| `commit-message`   | Commit message to use when committing changes.                                                                 | Yes      |                        |
+| `trigger-branch`   | The branch where changes were made and where the action will attempt to push directly.                         | Yes      |                        |
+| `pr-branch`        | The branch to create and push from if a PR is needed. If not provided, defaults to `poosh/{trigger-branch}`. If provided and does not contain `/`, it will be prefixed with `poosh/`. | No       | `poosh/{trigger-branch}` |
+| `trigger-pr-number`| PR number of the triggering PR (for PR body).                                                                 | No       |                        |
 
 ## Outputs
 
-| Name         | Description                                                        |
-|--------------|--------------------------------------------------------------------|
-| `branch`     | The full branch name used for push/PR (always prefixed with `poosh/`). |
-| `commit-sha` | The commit SHA of the pushed commit (if a commit was made).        |
-| `pr-url`     | The URL of the created pull request (if a PR was opened).          |
-| `pr-number`  | The number of the created pull request (if a PR was opened).       |
+| Name            | Description                                                        |
+|-----------------|--------------------------------------------------------------------|
+| `trigger-branch`| The branch that was pushed to or targeted by the PR.               |
+| `commit-sha`    | The commit SHA of the pushed commit (if a commit was made).        |
+| `pr-url`        | The URL of the created pull request (if a PR was opened).          |
+| `pr-number`     | The number of the created pull request (if a PR was opened).       |
 
 ## Usage
 
@@ -40,41 +38,41 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 - uses: ./actions/poosh
   with:
     commit-message: "chore: update generated files"
-    branch: "autogen"
+    trigger-branch: "autogen"
 ```
 
-### Open a pull request (on non-push event)
+### Open a pull request (on non-push event, with default PR branch)
 
 ```yaml
 - uses: ./actions/poosh
   with:
     commit-message: "chore: update"
-    branch: "feature-update"
+    trigger-branch: "feature-update"
+    # pr-branch is omitted, so will default to poosh/feature-update
     trigger-pr-number: ${{ github.event.pull_request.number }}
-    trigger-branch-name: ${{ github.head_ref || github.ref_name }}
 ```
 
-### Custom PR body
+### Open a pull request (with custom PR branch)
 
 ```yaml
 - uses: ./actions/poosh
   with:
     commit-message: "chore: update"
-    branch: "feature-update"
-    pr-body: |
-      This PR updates build artifacts based on the latest implementation. Generated by GitHub Actions.
-      Triggered by #1234
+    trigger-branch: "feature-update"
+    pr-branch: "poosh/artifacts-1234"
+    trigger-pr-number: ${{ github.event.pull_request.number }}
 ```
 
 ## Validation & Warnings
 
-- Fails if `commit-message` or `branch` is missing or invalid.
-- Warns if neither `trigger-pr-number` nor `trigger-branch-name` is set (PR body will not include a trigger reference).
-- Only allows alphanumeric, `.`, `_`, `-`, and `/` in the branch suffix.
+- Fails if `commit-message` or `trigger-branch` is missing or invalid.
+- Fails if `pr-branch` is provided but invalid.
+- Warns if `trigger-pr-number` is not set (PR body will not include a trigger reference).
+- Only allows alphanumeric, `.`, `_`, `-`, and `/` in branch names.
 
 ## Outputs
 
-- `branch`: The full branch name used (e.g., `poosh/autogen`)
+- `trigger-branch`: The branch that was pushed to or targeted by the PR.
 - `commit-sha`: The commit SHA (if a commit was made)
 - `pr-url`: The pull request URL (if a PR was opened)
 - `pr-number`: The pull request number (if a PR was opened)
@@ -82,14 +80,13 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 ## How It Works
 
 1. Validates all inputs and combinations, failing early with clear errors.
-2. Sets the branch name as `poosh/{branch}`.
-3. If changes are detected:
-   - On push events, commits and pushes to the branch.
-   - On other events, opens a pull request from the branch.
+2. If changes are detected:
+   - On push events, commits and pushes to `trigger-branch`.
+   - If direct push fails, creates a PR from `pr-branch` (or `poosh/{trigger-branch}` if not provided) to `trigger-branch`.
    - PR title is always the commit message.
    - PR branch is always deleted after merge/close.
-   - PR body is set via `pr-body` if provided, otherwise a default is used.
-4. Sets outputs for branch, commit SHA, PR URL, and PR number.
+   - PR body includes the triggering branch and PR number if provided.
+3. Sets outputs for target branch, commit SHA, PR URL, and PR number.
 
 ## License
 
