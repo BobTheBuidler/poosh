@@ -61,6 +61,14 @@ runs:
         fi
       shell: bash
 
+    - name: Checkout trigger branch before commit
+      run: |
+        set -e
+        git fetch origin "${{ inputs.trigger-branch }}:${{ inputs.trigger-branch }}" || git fetch origin "${{ inputs.trigger-branch }}"
+        git checkout "${{ inputs.trigger-branch }}"
+        git pull origin "${{ inputs.trigger-branch }}" || true
+      shell: bash
+
     - name: Check for changes
       id: check_changes
       run: |
@@ -86,10 +94,6 @@ runs:
       id: try_push
       run: |
         set -e
-        # Ensure the trigger branch exists locally by fetching it from origin
-        git fetch origin "${{ inputs.trigger-branch }}:${{ inputs.trigger-branch }}" || git fetch origin "${{ inputs.trigger-branch }}"
-        git checkout "${{ inputs.trigger-branch }}"
-        git pull origin "${{ inputs.trigger-branch }}" || true
         git push origin "${{ inputs.trigger-branch }}" && echo "push_success=true" >> $GITHUB_OUTPUT || echo "push_success=false" >> $GITHUB_OUTPUT
       shell: bash
 
