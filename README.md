@@ -19,6 +19,7 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 | `commit-message`   | Commit message to use when committing changes.                                                                 | Yes      |                        |
 | `trigger-branch`   | The branch where changes were made and where the action will attempt to push directly.                         | Yes      |                        |
 | `pr-branch`        | The branch to create and push from if a PR is needed. If not provided, defaults to `poosh/{trigger-branch}`. If provided and does not contain `/`, it will be prefixed with `poosh/`. | No       | `poosh/{trigger-branch}` |
+| `pr-base`          | The base branch to target if a PR is needed. Defaults to `trigger-branch`.                                  | No       | `trigger-branch`        |
 | `trigger-pr-number`| PR number of the triggering PR (for PR body).                                                                 | No       |                        |
 
 ## Outputs
@@ -60,6 +61,16 @@ A composite GitHub Action to commit, push, or open a pull request for any change
     commit-message: "chore: update"
     trigger-branch: "feature-update"
     pr-branch: "poosh/artifacts-1234"
+    trigger-pr-number: ${{ github.event.pull_request.number }}
+
+### Open a pull request targeting a different base branch (fork PR fallback)
+
+```yaml
+- uses: ./actions/poosh
+  with:
+    commit-message: "chore: update"
+    trigger-branch: "feature-update"
+    pr-base: "main"
     trigger-pr-number: ${{ github.event.pull_request.number }}
 ```
 
