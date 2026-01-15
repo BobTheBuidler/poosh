@@ -12,6 +12,10 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 - Robust input validation and clear warnings
 - Outputs target branch name, commit SHA, PR URL, and PR number
 
+## Release Safety
+
+Releases are immutable. Published tags and artifacts are never modified or replaced, providing assurance of user safety.
+
 ## Inputs
 
 | Name               | Description                                                                                                    | Required | Default                |
@@ -62,6 +66,7 @@ A composite GitHub Action to commit, push, or open a pull request for any change
     trigger-branch: "feature-update"
     pr-branch: "poosh/artifacts-1234"
     trigger-pr-number: ${{ github.event.pull_request.number }}
+```
 
 ### Open a pull request targeting a different base branch (fork PR fallback)
 
