@@ -13,6 +13,10 @@ inputs:
     description: "The name of the branch to create and push from if a PR is needed. If not provided, defaults to 'poosh/{trigger-branch}'. If provided and does not contain '/', it will be prefixed with 'poosh/'."
     required: false
     default: ""
+  pr-base:
+    description: "The base branch to target if a PR is needed. Defaults to the trigger-branch."
+    required: false
+    default: ""
   trigger-pr-number:
     description: "Optional: PR number of the triggering PR (e.g., 1234). If set, the PR body will include 'Triggered by #<number>'."
     required: false
@@ -61,12 +65,29 @@ runs:
         fi
       shell: bash
 
+    - name: Validate 'pr-base'
+      run: |
+        if [[ -n "${{ inputs.pr-base }}" && "${{ inputs.pr-base }}" == *[!a-zA-Z0-9._/-]* ]]; then
+          echo "ERROR: 'pr-base' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed."
+          exit 1
+        fi
+      shell: bash
+
     - name: Checkout trigger branch before commit
       run: |
         set -e
-        git fetch origin "${{ inputs.trigger-branch }}:${{ inputs.trigger-branch }}" || git fetch origin "${{ inputs.trigger-branch }}"
-        git checkout "${{ inputs.trigger-branch }}"
-        git pull origin "${{ inputs.trigger-branch }}" || true
+        current_branch=$(git rev-parse --abbrev-ref HEAD)
+        if [[ "$current_branch" == "${{ inputs.trigger-branch }}" ]]; then
+          exit 0
+        fi
+
+        if git ls-remote --exit-code --heads origin "${{ inputs.trigger-branch }}" >/dev/null 2>&1; then
+          git fetch origin "${{ inputs.trigger-branch }}:${{ inputs.trigger-branch }}" || git fetch origin "${{ inputs.trigger-branch }}"
+          git checkout "${{ inputs.trigger-branch }}"
+          git pull origin "${{ inputs.trigger-branch }}" || true
+        else
+          echo "::notice::Trigger branch '${{ inputs.trigger-branch }}' not found on origin; staying on current HEAD."
+        fi
       shell: bash
 
     - name: Check for changes
@@ -94,7 +115,7 @@ runs:
       id: try_push
       run: |
         set -e
-        git push origin "${{ inputs.trigger-branch }}" && echo "push_success=true" >> $GITHUB_OUTPUT || echo "push_success=false" >> $GITHUB_OUTPUT
+        git push origin "HEAD:${{ inputs.trigger-branch }}" && echo "push_success=true" >> $GITHUB_OUTPUT || echo "push_success=false" >> $GITHUB_OUTPUT
       shell: bash
 
     - name: Validate triggers
@@ -145,7 +166,7 @@ runs:
       uses: peter-evans/create-pull-request@v7
       with:
         branch: ${{ steps.pr_branch.outputs.pr_branch }}
-        base: ${{ inputs.trigger-branch }}
+        base: ${{ inputs.pr-base || inputs.trigger-branch }}
         title: ${{ inputs.commit-message }}
         body: ${{ steps.compose_pr_body.outputs.body }}
         commit-message: ${{ inputs.commit-message }}
