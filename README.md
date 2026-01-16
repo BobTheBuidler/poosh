@@ -10,6 +10,7 @@ A composite GitHub Action to commit, push, or open a pull request for any change
 - PR title is always set to the commit message
 - PR branch is always deleted after merge/close (`delete-branch: true`)
 - Robust input validation and clear warnings
+- If workflow files are modified without `workflows` permission, Poosh skips those files and continues with a PR for the remaining changes (or no-ops if only workflow changes)
 - Outputs target branch name, commit SHA, PR URL, and PR number
 
 ## Release Safety
