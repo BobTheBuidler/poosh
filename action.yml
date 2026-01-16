@@ -110,12 +110,35 @@ runs:
         git commit -m "${{ inputs.commit-message }}"
       shell: bash
 
+    - name: Detect workflow changes
+      if: steps.check_changes.outputs.changed == 'true'
+      id: workflow_changes
+      run: |
+        if git show --name-only --pretty="" HEAD -- .github/workflows | grep -q .; then
+          echo "workflow_changes=true" >> $GITHUB_OUTPUT
+        else
+          echo "workflow_changes=false" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+
     - name: Try direct push to trigger branch
       if: steps.check_changes.outputs.changed == 'true'
       id: try_push
       run: |
         set -e
-        git push origin "HEAD:${{ inputs.trigger-branch }}" && echo "push_success=true" >> $GITHUB_OUTPUT || echo "push_success=false" >> $GITHUB_OUTPUT
+        push_err_file="$(mktemp)"
+        if git push origin "HEAD:${{ inputs.trigger-branch }}" 2> "$push_err_file"; then
+          echo "push_success=true" >> $GITHUB_OUTPUT
+          echo "workflow_push_denied=false" >> $GITHUB_OUTPUT
+        else
+          echo "push_success=false" >> $GITHUB_OUTPUT
+          if grep -q "refusing to allow a GitHub App to create or update workflow" "$push_err_file"; then
+            echo "workflow_push_denied=true" >> $GITHUB_OUTPUT
+          else
+            echo "workflow_push_denied=false" >> $GITHUB_OUTPUT
+          fi
+          cat "$push_err_file" >&2
+        fi
       shell: bash
 
     - name: Validate triggers
@@ -138,7 +161,22 @@ runs:
         else
           PR_BRANCH="${{ inputs.pr-branch }}"
         fi
-        git checkout -b "$PR_BRANCH"
+        if [[ "${{ steps.try_push.outputs.workflow_push_denied }}" == "true" && "${{ steps.workflow_changes.outputs.workflow_changes }}" == "true" ]]; then
+          echo "::warning::Push blocked because workflow files changed and workflows permission is missing. Creating PR without workflow file updates."
+          ORIG_SHA=$(git rev-parse HEAD)
+          BASE_SHA=$(git rev-parse HEAD~1)
+          git checkout -b "$PR_BRANCH" "$BASE_SHA"
+          git restore --source "$ORIG_SHA" --staged --worktree .
+          git restore --source "$BASE_SHA" --staged --worktree .github/workflows || true
+          if git diff --cached --quiet; then
+            echo "::notice::Only workflow changes detected; nothing to push."
+            echo "pr_branch=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          git commit -m "${{ inputs.commit-message }}"
+        else
+          git checkout -b "$PR_BRANCH"
+        fi
         git push origin "$PR_BRANCH"
         echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
       shell: bash
@@ -161,7 +199,7 @@ runs:
       shell: bash
 
     - name: Create Pull Request (if direct push failed)
-      if: steps.check_changes.outputs.changed == 'true' && steps.try_push.outputs.push_success == 'false'
+      if: steps.check_changes.outputs.changed == 'true' && steps.try_push.outputs.push_success == 'false' && steps.pr_branch.outputs.pr_branch != ''
       id: create_pr
       uses: peter-evans/create-pull-request@v7
       with:
