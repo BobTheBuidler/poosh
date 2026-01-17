@@ -127,12 +127,13 @@ runs:
       run: |
         set -e
         push_err_file="$(mktemp)"
-        if git push origin "HEAD:${{ inputs.trigger-branch }}" 2> "$push_err_file"; then
+        workflow_error_regex="create or update workflow|workflows? permission|workflows? scope"
+        if git push origin "HEAD:${{ inputs.trigger-branch }}" > "$push_err_file" 2>&1; then
           echo "push_success=true" >> $GITHUB_OUTPUT
           echo "workflow_push_denied=false" >> $GITHUB_OUTPUT
         else
           echo "push_success=false" >> $GITHUB_OUTPUT
-          if grep -q "refusing to allow a GitHub App to create or update workflow" "$push_err_file"; then
+          if grep -Eiq "$workflow_error_regex" "$push_err_file"; then
             echo "workflow_push_denied=true" >> $GITHUB_OUTPUT
           else
             echo "workflow_push_denied=false" >> $GITHUB_OUTPUT
@@ -154,6 +155,38 @@ runs:
       id: pr_branch
       run: |
         set -e
+        workflow_error_regex="create or update workflow|workflows? permission|workflows? scope"
+        resolve_base_sha() {
+          local base_sha
+          base_sha=$(git rev-parse HEAD~1 2>/dev/null || true)
+          if [[ -z "$base_sha" && "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            echo "::notice::Shallow clone detected; fetching one more commit to strip workflow changes."
+            git fetch --deepen=1 origin "${{ inputs.trigger-branch }}" >/dev/null 2>&1 || \
+              git fetch --deepen=1 origin >/dev/null 2>&1 || true
+            base_sha=$(git rev-parse HEAD~1 2>/dev/null || true)
+          fi
+          if [[ -z "$base_sha" ]]; then
+            echo "::error::Unable to resolve the parent commit to strip workflow changes. Ensure checkout fetch-depth is at least 2."
+            exit 1
+          fi
+          echo "$base_sha"
+        }
+        strip_workflows_and_commit() {
+          echo "::warning::Push blocked because workflow files changed and workflows permission is missing. Creating PR without workflow file updates."
+          local orig_sha
+          local base_sha
+          orig_sha=$(git rev-parse HEAD)
+          base_sha=$(resolve_base_sha)
+          git checkout -B "$PR_BRANCH" "$base_sha"
+          git restore --source "$orig_sha" --staged --worktree .
+          git restore --source "$base_sha" --staged --worktree .github/workflows || true
+          if git diff --cached --quiet; then
+            echo "::notice::Only workflow changes detected; nothing to push."
+            echo "pr_branch=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          git commit -m "${{ inputs.commit-message }}"
+        }
         if [[ -z "${{ inputs.pr-branch }}" ]]; then
           PR_BRANCH="poosh/${{ inputs.trigger-branch }}"
         elif [[ "${{ inputs.pr-branch }}" != */* ]]; then
@@ -162,22 +195,23 @@ runs:
           PR_BRANCH="${{ inputs.pr-branch }}"
         fi
         if [[ "${{ steps.try_push.outputs.workflow_push_denied }}" == "true" && "${{ steps.workflow_changes.outputs.workflow_changes }}" == "true" ]]; then
-          echo "::warning::Push blocked because workflow files changed and workflows permission is missing. Creating PR without workflow file updates."
-          ORIG_SHA=$(git rev-parse HEAD)
-          BASE_SHA=$(git rev-parse HEAD~1)
-          git checkout -b "$PR_BRANCH" "$BASE_SHA"
-          git restore --source "$ORIG_SHA" --staged --worktree .
-          git restore --source "$BASE_SHA" --staged --worktree .github/workflows || true
-          if git diff --cached --quiet; then
-            echo "::notice::Only workflow changes detected; nothing to push."
-            echo "pr_branch=" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          git commit -m "${{ inputs.commit-message }}"
+          strip_workflows_and_commit
         else
           git checkout -b "$PR_BRANCH"
         fi
-        git push origin "$PR_BRANCH"
+        push_err_file="$(mktemp)"
+        if git push origin "$PR_BRANCH" > "$push_err_file" 2>&1; then
+          echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        if grep -Eiq "$workflow_error_regex" "$push_err_file" && \
+          [[ "${{ steps.workflow_changes.outputs.workflow_changes }}" == "true" ]]; then
+          strip_workflows_and_commit
+          git push origin "$PR_BRANCH"
+        else
+          cat "$push_err_file" >&2
+          exit 1
+        fi
         echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
       shell: bash
 
