@@ -6,5 +6,8 @@ All agents must follow these rules:
 2) PR titles must be descriptive and follow Conventional Commits-style prefixes:
    - Common: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`, `perf:`
    - Support titles: `fix(docs):`, `fix(benchmarks):`, `fix(cicd):`
+3) Commit messages must follow the same Conventional Commits-style prefixes and include a short functional description plus a user-facing value proposition.
+4) PR descriptions must include Summary, Rationale, and Details sections.
+5) If the branch you're assigned to work on is from a remote (ie origin/master or upstream/awesome-feature), fetch first and sync your local branch with the remote before you start (eg `git fetch --prune` then `git pull --ff-only` or `git rebase <remote>/<branch>`).
 
 Reference: https://www.conventionalcommits.org/en/v1.0.0/
