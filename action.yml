@@ -125,17 +125,6 @@ runs:
         git commit -m "${{ inputs.commit-message }}"
       shell: bash
 
-    - name: Detect workflow changes
-      if: steps.check_changes.outputs.changed == 'true'
-      id: workflow_changes
-      run: |
-        if git show --name-only --pretty="" HEAD -- .github/workflows | grep -q .; then
-          echo "workflow_changes=true" >> $GITHUB_OUTPUT
-        else
-          echo "workflow_changes=false" >> $GITHUB_OUTPUT
-        fi
-      shell: bash
-
     - name: Try direct push to trigger branch
       if: steps.check_changes.outputs.changed == 'true'
       id: try_push
@@ -209,7 +198,7 @@ runs:
         else
           PR_BRANCH="${{ inputs.pr-branch }}"
         fi
-        if [[ "${{ steps.try_push.outputs.workflow_push_denied }}" == "true" && "${{ steps.workflow_changes.outputs.workflow_changes }}" == "true" ]]; then
+        if [[ "${{ steps.try_push.outputs.workflow_push_denied }}" == "true" && "${{ steps.check_changes.outputs.workflow_changes }}" == "true" ]]; then
           strip_workflows_and_commit
         else
           git checkout -b "$PR_BRANCH"
@@ -220,7 +209,7 @@ runs:
           exit 0
         fi
         if grep -Eiq "$workflow_error_regex" "$push_err_file" && \
-          [[ "${{ steps.workflow_changes.outputs.workflow_changes }}" == "true" ]]; then
+          [[ "${{ steps.check_changes.outputs.workflow_changes }}" == "true" ]]; then
           strip_workflows_and_commit
           git push origin "$PR_BRANCH"
         else
