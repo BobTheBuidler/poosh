@@ -10,7 +10,7 @@ inputs:
     description: "The branch where changes were made and where the action will attempt to push directly. If direct push fails, a PR will be opened to this branch."
     required: true
   pr-branch:
-    description: "The name of the branch to create and push from if a PR is needed. If not provided, defaults to 'poosh/{trigger-branch}'. If provided and does not contain '/', it will be prefixed with 'poosh/'."
+    description: "The name of the branch to create and push from if a PR is needed. If not provided, defaults to 'poosh/{trigger-branch}' and appends '-<n>' when needed to avoid remote branch collisions. If provided and does not contain '/', it will be prefixed with 'poosh/'."
     required: false
     default: ""
   pr-base:
@@ -160,6 +160,26 @@ runs:
       run: |
         set -e
         workflow_error_regex="create or update workflow|workflows? permission|workflows? scope"
+        branch_collision_regex="non-fast-forward|failed to push some refs|fetch first|updates were rejected"
+        LAST_PUSH_OUTPUT=""
+        branch_exists_remote() {
+          git ls-remote --exit-code --heads origin "refs/heads/$1" >/dev/null 2>&1
+        }
+        next_available_pr_branch() {
+          local base_branch="$1"
+          local suffix="${2:-0}"
+          local candidate
+          if (( suffix > 0 )); then
+            candidate="${base_branch}-${suffix}"
+          else
+            candidate="$base_branch"
+          fi
+          while branch_exists_remote "$candidate"; do
+            suffix=$((suffix + 1))
+            candidate="${base_branch}-${suffix}"
+          done
+          echo "$candidate"
+        }
         resolve_base_sha() {
           local base_sha
           base_sha=$(git rev-parse HEAD~1 2>/dev/null || true)
@@ -191,29 +211,63 @@ runs:
           fi
           git commit -m "${{ inputs.commit-message }}"
         }
+        push_pr_branch() {
+          local collision_retries=0
+          local push_err_file
+          local push_output
+          while true; do
+            push_err_file="$(mktemp)"
+            if git push origin "$PR_BRANCH" > "$push_err_file" 2>&1; then
+              LAST_PUSH_OUTPUT=""
+              return 0
+            fi
+            push_output="$(cat "$push_err_file")"
+            if [[ "$AUTO_PR_BRANCH" == "true" ]] && \
+              grep -Eiq "$branch_collision_regex" <<< "$push_output" && \
+              branch_exists_remote "$PR_BRANCH"; then
+              collision_retries=$((collision_retries + 1))
+              if (( collision_retries > 20 )); then
+                LAST_PUSH_OUTPUT="$push_output"
+                return 1
+              fi
+              PR_BRANCH="$(next_available_pr_branch "$PR_BRANCH_BASE" "$collision_retries")"
+              echo "::notice::Fallback branch '$PR_BRANCH_BASE' already exists remotely; retrying with '$PR_BRANCH'."
+              git checkout -B "$PR_BRANCH"
+              continue
+            fi
+            LAST_PUSH_OUTPUT="$push_output"
+            return 1
+          done
+        }
         if [[ -z "${{ inputs.pr-branch }}" ]]; then
-          PR_BRANCH="poosh/${{ inputs.trigger-branch }}"
+          PR_BRANCH_BASE="poosh/${{ inputs.trigger-branch }}"
+          PR_BRANCH="$(next_available_pr_branch "$PR_BRANCH_BASE")"
+          AUTO_PR_BRANCH="true"
         elif [[ "${{ inputs.pr-branch }}" != */* ]]; then
           PR_BRANCH="poosh/${{ inputs.pr-branch }}"
+          AUTO_PR_BRANCH="false"
         else
           PR_BRANCH="${{ inputs.pr-branch }}"
+          AUTO_PR_BRANCH="false"
         fi
         if [[ "${{ steps.try_push.outputs.workflow_push_denied }}" == "true" && "${{ steps.check_changes.outputs.workflow_changes }}" == "true" ]]; then
           strip_workflows_and_commit
         else
           git checkout -b "$PR_BRANCH"
         fi
-        push_err_file="$(mktemp)"
-        if git push origin "$PR_BRANCH" > "$push_err_file" 2>&1; then
+        if push_pr_branch; then
           echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
           exit 0
         fi
-        if grep -Eiq "$workflow_error_regex" "$push_err_file" && \
-          [[ "${{ steps.check_changes.outputs.workflow_changes }}" == "true" ]]; then
+        if [[ "${{ steps.check_changes.outputs.workflow_changes }}" == "true" ]] && \
+          grep -Eiq "$workflow_error_regex" <<< "$LAST_PUSH_OUTPUT"; then
           strip_workflows_and_commit
-          git push origin "$PR_BRANCH"
+          if ! push_pr_branch; then
+            echo "$LAST_PUSH_OUTPUT" >&2
+            exit 1
+          fi
         else
-          cat "$push_err_file" >&2
+          echo "$LAST_PUSH_OUTPUT" >&2
           exit 1
         fi
         echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
