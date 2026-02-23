@@ -27,6 +27,8 @@ jobs:
           const REPO_SLUG = process.env.GITHUB_REPOSITORY || 'local/poosh';
           const WORKFLOW_ERROR_REGEX =
             /create or update workflow|workflows? permission|workflows? scope/i;
+          const BRANCH_COLLISION_REGEX =
+            /non-fast-forward|failed to push some refs|fetch first|updates were rejected/i;
 
           const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: 'pipe' });
           const output = (cmd, cwd) => execSync(cmd, { cwd, encoding: 'utf8' }).trim();
@@ -75,7 +77,23 @@ jobs:
             fs.chmodSync(hookPath, 0o755);
           };
 
-          const setupRepo = ({ defaultBranch = 'main', rejectBranch, rejectWorkflowChanges } = {}) => {
+          const seedRemoteBranch = (repo, defaultBranch, branch) => {
+            run(`git checkout ${defaultBranch}`, repo);
+            run(`git checkout -b ${branch}`, repo);
+            fs.writeFileSync(path.join(repo, 'seed.txt'), `${branch}\n`);
+            run('git add seed.txt', repo);
+            run(`git commit -q -m "seed ${branch}"`, repo);
+            run(`git push origin ${branch}`, repo);
+            run(`git checkout ${defaultBranch}`, repo);
+            run(`git branch -D ${branch}`, repo);
+          };
+
+          const setupRepo = ({
+            defaultBranch = 'main',
+            rejectBranch,
+            rejectWorkflowChanges,
+            existingPrBranch,
+          } = {}) => {
             const base = fs.mkdtempSync(path.join(os.tmpdir(), 'poosh-test-'));
             run('git init --bare -q remote.git', base);
             const bare = path.join(base, 'remote.git');
@@ -94,6 +112,9 @@ jobs:
             run(`git branch -M ${defaultBranch}`, repo);
             run(`git remote add origin ${bare}`, repo);
             run(`git push -u origin ${defaultBranch}`, repo);
+            if (existingPrBranch) {
+              seedRemoteBranch(repo, defaultBranch, existingPrBranch);
+            }
             return { base, repo, bare };
           };
 
@@ -108,7 +129,7 @@ jobs:
 
           const remoteBranchExists = (repo, branch) => {
             try {
-              execSync(`git ls-remote --exit-code --heads origin ${branch}`, {
+              execSync(`git ls-remote --exit-code --heads origin "refs/heads/${branch}"`, {
                 cwd: repo,
                 stdio: 'ignore',
               });
@@ -124,6 +145,16 @@ jobs:
                 `ERROR: '${label}' contains invalid characters. Only alphanumeric, '.', '_', '-', and '/' are allowed.`
               );
             }
+          };
+
+          const nextAvailablePrBranch = (repo, baseBranch, suffix = 0) => {
+            let idx = suffix;
+            let candidate = idx === 0 ? baseBranch : `${baseBranch}-${idx}`;
+            while (remoteBranchExists(repo, candidate)) {
+              idx += 1;
+              candidate = `${baseBranch}-${idx}`;
+            }
+            return candidate;
           };
 
           const runPoosh = (repo, inputs) => {
@@ -186,8 +217,12 @@ jobs:
             }
 
             let prBranch = inputs.prBranch || '';
+            let autoPrBranch = false;
+            let prBranchBase = '';
             if (!prBranch) {
-              prBranch = `poosh/${triggerBranch}`;
+              prBranchBase = `poosh/${triggerBranch}`;
+              prBranch = nextAvailablePrBranch(repo, prBranchBase);
+              autoPrBranch = true;
             } else if (!prBranch.includes('/')) {
               prBranch = `poosh/${prBranch}`;
             }
@@ -213,6 +248,32 @@ jobs:
               return true;
             };
 
+            const pushPrBranch = () => {
+              let collisionRetries = 0;
+              while (true) {
+                const prPush = runWithOutput(`git push origin ${prBranch}`, repo);
+                if (prPush.ok) {
+                  return { ok: true, output: '' };
+                }
+
+                if (
+                  autoPrBranch &&
+                  BRANCH_COLLISION_REGEX.test(prPush.output) &&
+                  remoteBranchExists(repo, prBranch)
+                ) {
+                  collisionRetries += 1;
+                  if (collisionRetries > 20) {
+                    return prPush;
+                  }
+                  prBranch = nextAvailablePrBranch(repo, prBranchBase, collisionRetries);
+                  run(`git checkout -B ${prBranch}`, repo);
+                  continue;
+                }
+
+                return prPush;
+              }
+            };
+
             if (workflowPushDenied && workflowChanges) {
               if (!stripWorkflowsAndCommit()) {
                 return outputs;
@@ -221,13 +282,16 @@ jobs:
               run(`git checkout -b ${prBranch}`, repo);
             }
 
-            const prPush = runWithOutput(`git push origin ${prBranch}`, repo);
+            const prPush = pushPrBranch();
             if (!prPush.ok) {
               if (WORKFLOW_ERROR_REGEX.test(prPush.output) && workflowChanges) {
                 if (!stripWorkflowsAndCommit()) {
                   return outputs;
                 }
-                run(`git push origin ${prBranch}`, repo);
+                const retryPush = pushPrBranch();
+                if (!retryPush.ok) {
+                  throw new Error(retryPush.output || 'push failed');
+                }
               } else {
                 throw new Error(prPush.output || 'push failed');
               }
@@ -312,6 +376,50 @@ jobs:
               assert.strictEqual(fileDiff, 'file.txt');
             });
 
+          const testFallbackBranchCollision = () =>
+            withRepo(
+              { rejectBranch: 'blocked', existingPrBranch: 'poosh/blocked' },
+              ({ repo }) => {
+                fs.appendFileSync(path.join(repo, 'file.txt'), 'change\n');
+                const outputs = runPoosh(repo, {
+                  commitMessage: 'test: fallback collision',
+                  triggerBranch: 'blocked',
+                });
+                assert.strictEqual(outputs.prBranch, 'poosh/blocked-1');
+                assert.ok(remoteBranchExists(repo, outputs.prBranch));
+                assert.ok(remoteBranchExists(repo, 'poosh/blocked'));
+              }
+            );
+
+          const testWorkflowFallbackBranchCollision = () =>
+            withRepo(
+              { rejectWorkflowChanges: true, existingPrBranch: 'poosh/main' },
+              ({ repo }) => {
+                const workflowsDir = path.join(repo, '.github', 'workflows');
+                fs.mkdirSync(workflowsDir, { recursive: true });
+                fs.writeFileSync(path.join(workflowsDir, 'ci.yml'), 'name: ci\n');
+                fs.appendFileSync(path.join(repo, 'file.txt'), 'change\n');
+                const outputs = runPoosh(repo, {
+                  commitMessage: 'test: workflow collision fallback',
+                  triggerBranch: 'main',
+                });
+                assert.strictEqual(outputs.prBranch, 'poosh/main-1');
+                assert.ok(remoteBranchExists(repo, outputs.prBranch));
+                assert.ok(remoteBranchExists(repo, 'poosh/main'));
+                run(`git fetch origin ${outputs.prBranch}`, repo);
+                const workflowDiff = output(
+                  `git diff --name-only origin/${outputs.prBranch}~1 origin/${outputs.prBranch} -- .github/workflows`,
+                  repo
+                );
+                assert.strictEqual(workflowDiff, '');
+                const fileDiff = output(
+                  `git diff --name-only origin/${outputs.prBranch}~1 origin/${outputs.prBranch} -- file.txt`,
+                  repo
+                );
+                assert.strictEqual(fileDiff, 'file.txt');
+              }
+            );
+
           const testInvalidTriggerBranch = () => {
             assert.throws(
               () =>
@@ -330,6 +438,8 @@ jobs:
             testPushSuccess();
             testPushFailureCreatesPr();
             testWorkflowPermissionFallback();
+            testFallbackBranchCollision();
+            testWorkflowFallbackBranchCollision();
             testInvalidTriggerBranch();
             console.log('All tests passed.');
           };

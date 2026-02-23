@@ -23,7 +23,7 @@ Releases are immutable. Published tags and artifacts are never modified or repla
 |--------------------|----------------------------------------------------------------------------------------------------------------|----------|------------------------|
 | `commit-message`   | Commit message to use when committing changes.                                                                 | Yes      |                        |
 | `trigger-branch`   | The branch where changes were made and where the action will attempt to push directly.                         | Yes      |                        |
-| `pr-branch`        | The branch to create and push from if a PR is needed. If not provided, defaults to `poosh/{trigger-branch}`. If provided and does not contain `/`, it will be prefixed with `poosh/`. | No       | `poosh/{trigger-branch}` |
+| `pr-branch`        | The branch to create and push from if a PR is needed. If not provided, defaults to `poosh/{trigger-branch}` and auto-suffixes (`-1`, `-2`, ...) when needed to avoid remote branch collisions. If provided and does not contain `/`, it will be prefixed with `poosh/`. | No       | `poosh/{trigger-branch}` |
 | `pr-base`          | The base branch to target if a PR is needed. Defaults to `trigger-branch`.                                  | No       | `trigger-branch`        |
 | `trigger-pr-number`| PR number of the triggering PR (for PR body).                                                                 | No       |                        |
 
@@ -54,7 +54,7 @@ Releases are immutable. Published tags and artifacts are never modified or repla
   with:
     commit-message: "chore: update"
     trigger-branch: "feature-update"
-    # pr-branch is omitted, so will default to poosh/feature-update
+    # pr-branch is omitted, so Poosh will use poosh/feature-update (or a suffixed variant if needed)
     trigger-pr-number: ${{ github.event.pull_request.number }}
 ```
 
@@ -99,7 +99,7 @@ Releases are immutable. Published tags and artifacts are never modified or repla
 1. Validates all inputs and combinations, failing early with clear errors.
 2. If changes are detected:
    - On push events, commits and pushes to `trigger-branch`.
-   - If direct push fails, creates a PR from `pr-branch` (or `poosh/{trigger-branch}` if not provided) to `trigger-branch`.
+   - If direct push fails, creates a PR from `pr-branch` (or `poosh/{trigger-branch}` with collision-safe suffixing if not provided) to `trigger-branch`.
    - PR title is always the commit message.
    - PR branch is always deleted after merge/close.
    - PR body includes the triggering branch and PR number if provided.
