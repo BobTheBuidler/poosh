@@ -27,7 +27,7 @@ const buildWorkflowFallbackTests = () => [
       }),
   ],
   [
-    'testFallbackBranchCollision',
+    'testFallbackBranchCollisionUpdatesByDefault',
     () =>
       withRepo({ rejectBranch: 'blocked', existingPrBranch: 'poosh/blocked' }, ({ repo }) => {
         addFileChange(repo);
@@ -36,13 +36,28 @@ const buildWorkflowFallbackTests = () => [
           triggerBranch: 'blocked',
         });
 
-        assert.strictEqual(outputs.prBranch, 'poosh/blocked-1');
+        assert.strictEqual(outputs.prBranch, 'poosh/blocked');
         assert.ok(remoteBranchExists(repo, outputs.prBranch));
-        assert.ok(remoteBranchExists(repo, 'poosh/blocked'));
       }),
   ],
   [
-    'testWorkflowFallbackBranchCollision',
+    'testFallbackBranchCollisionUniqueStrategy',
+    () =>
+      withRepo({ rejectBranch: 'blocked', existingPrBranch: 'poosh/blocked' }, ({ repo }) => {
+        addFileChange(repo);
+        const outputs = runPoosh(repo, {
+          commitMessage: 'test: fallback unique collision',
+          triggerBranch: 'blocked',
+          prBranchStrategy: 'unique',
+        });
+
+        assert.strictEqual(outputs.prBranch, 'poosh/blocked-1');
+        assert.ok(remoteBranchExists(repo, 'poosh/blocked'));
+        assert.ok(remoteBranchExists(repo, outputs.prBranch));
+      }),
+  ],
+  [
+    'testWorkflowFallbackBranchCollisionUpdatesByDefault',
     () =>
       withRepo({ rejectWorkflowChanges: true, existingPrBranch: 'poosh/main' }, ({ repo }) => {
         addWorkflowChange(repo);
@@ -52,9 +67,8 @@ const buildWorkflowFallbackTests = () => [
           triggerBranch: 'main',
         });
 
-        assert.strictEqual(outputs.prBranch, 'poosh/main-1');
+        assert.strictEqual(outputs.prBranch, 'poosh/main');
         assert.ok(remoteBranchExists(repo, outputs.prBranch));
-        assert.ok(remoteBranchExists(repo, 'poosh/main'));
         assertWorkflowFilesStripped(repo, outputs.prBranch);
       }),
   ],

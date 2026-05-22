@@ -34,7 +34,9 @@ const runPoosh = (repo, inputs) => {
   const actionInputs = toActionInputs(inputs);
   ensureActionStepSuccess("Validate 'commit-message'", { inputs: actionInputs });
   ensureActionStepSuccess("Validate 'trigger-branch'", { inputs: actionInputs });
+  ensureActionStepSuccess("Validate 'direct-push'", { inputs: actionInputs });
   ensureActionStepSuccess("Validate 'pr-branch'", { inputs: actionInputs });
+  ensureActionStepSuccess("Validate 'pr-branch-strategy'", { inputs: actionInputs });
   ensureActionStepSuccess("Validate 'pr-base'", { inputs: actionInputs });
 
   const commitMessage = actionInputs['commit-message'];
@@ -64,25 +66,31 @@ const runPoosh = (repo, inputs) => {
   run(`git commit -m "${safeMessage}"`, repo);
   outputs.commitSha = output('git rev-parse HEAD', repo);
 
+  const directPush = actionInputs['direct-push'] === 'true';
   const workflowChanges = output('git show --name-only --pretty="" HEAD -- .github/workflows', repo) !== '';
-  const pushResult = runWithOutput(`git push origin "HEAD:${triggerBranch}"`, repo);
-  const workflowPushDenied = !pushResult.ok && WORKFLOW_ERROR_REGEX.test(pushResult.output);
+  let workflowPushDenied = false;
 
-  if (pushResult.ok) {
-    return outputs;
+  if (directPush) {
+    const pushResult = runWithOutput(`git push origin "HEAD:${triggerBranch}"`, repo);
+    workflowPushDenied = !pushResult.ok && WORKFLOW_ERROR_REGEX.test(pushResult.output);
+
+    if (pushResult.ok) {
+      return outputs;
+    }
   }
 
-  let prBranch = actionInputs['pr-branch'];
-  let autoPrBranch = false;
-  let prBranchBase = '';
+  let prBranchBase = actionInputs['pr-branch'];
+  const prBranchStrategy = actionInputs['pr-branch-strategy'];
 
-  if (!prBranch) {
+  if (!prBranchBase) {
     prBranchBase = `poosh/${triggerBranch}`;
-    prBranch = nextAvailablePrBranch(repo, prBranchBase);
-    autoPrBranch = true;
-  } else if (!prBranch.includes('/')) {
-    prBranch = `poosh/${prBranch}`;
+  } else if (!prBranchBase.includes('/')) {
+    prBranchBase = `poosh/${prBranchBase}`;
   }
+  let prBranch =
+    prBranchStrategy === 'unique'
+      ? nextAvailablePrBranch(repo, prBranchBase)
+      : prBranchBase;
 
   const resolveBaseSha = () => {
     let baseSha = '';
@@ -128,15 +136,34 @@ const runPoosh = (repo, inputs) => {
 
   const pushPrBranch = () => {
     let collisionRetries = 0;
+    let leaseRetries = 0;
 
     while (true) {
-      const prPush = runWithOutput(`git push origin ${prBranch}`, repo);
+      let prPush;
+      if (prBranchStrategy === 'update' && remoteBranchExists(repo, prBranch)) {
+        run(`git fetch origin +refs/heads/${prBranch}:refs/remotes/origin/${prBranch}`, repo);
+        const expectedSha = output(`git rev-parse refs/remotes/origin/${prBranch}`, repo);
+        prPush = runWithOutput(
+          `git push --force-with-lease=refs/heads/${prBranch}:${expectedSha} origin HEAD:refs/heads/${prBranch}`,
+          repo
+        );
+      } else {
+        prPush = runWithOutput(`git push origin HEAD:refs/heads/${prBranch}`, repo);
+      }
       if (prPush.ok) {
         return { ok: true, output: '' };
       }
 
+      if (prBranchStrategy === 'update' && BRANCH_COLLISION_REGEX.test(prPush.output)) {
+        leaseRetries += 1;
+        if (leaseRetries > 5) {
+          return prPush;
+        }
+        continue;
+      }
+
       if (
-        autoPrBranch &&
+        prBranchStrategy === 'unique' &&
         BRANCH_COLLISION_REGEX.test(prPush.output) &&
         remoteBranchExists(repo, prBranch)
       ) {
@@ -150,6 +177,13 @@ const runPoosh = (repo, inputs) => {
         continue;
       }
 
+      if (prBranchStrategy === 'fail' && remoteBranchExists(repo, prBranch)) {
+        return {
+          ok: false,
+          output: `PR branch '${prBranch}' already exists and pr-branch-strategy is 'fail'.`,
+        };
+      }
+
       return prPush;
     }
   };
@@ -159,7 +193,7 @@ const runPoosh = (repo, inputs) => {
       return outputs;
     }
   } else {
-    run(`git checkout -b ${prBranch}`, repo);
+    run(`git checkout -B ${prBranch}`, repo);
   }
 
   const prPush = pushPrBranch();

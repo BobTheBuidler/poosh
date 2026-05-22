@@ -176,7 +176,9 @@ const runActionStep = ({ stepName, context = {}, cwd = process.cwd(), env = {} }
 const defaultActionInputs = (overrides = {}) => ({
   'commit-message': 'test: local harness',
   'trigger-branch': 'main',
+  'direct-push': 'true',
   'pr-branch': '',
+  'pr-branch-strategy': 'update',
   'pr-base': '',
   'trigger-pr-number': '',
   'pr-body': DEFAULT_PR_BODY,
@@ -187,7 +189,9 @@ const toActionInputs = (inputs = {}) =>
   defaultActionInputs({
     'commit-message': inputs.commitMessage || '',
     'trigger-branch': inputs.triggerBranch || '',
+    'direct-push': inputs.directPush || 'true',
     'pr-branch': inputs.prBranch || '',
+    'pr-branch-strategy': inputs.prBranchStrategy || 'update',
     'pr-base': inputs.prBase || '',
     'trigger-pr-number': inputs.triggerPrNumber || '',
     'pr-body': inputs.prBody || DEFAULT_PR_BODY,

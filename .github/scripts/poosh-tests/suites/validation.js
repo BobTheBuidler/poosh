@@ -50,6 +50,26 @@ const buildValidationTests = () => [
     },
   ],
   [
+    'testInvalidDirectPush',
+    () => {
+      assertActionStepFails({
+        stepName: "Validate 'direct-push'",
+        inputs: { 'direct-push': 'maybe' },
+        pattern: /'direct-push' must be 'true' or 'false'/,
+      });
+    },
+  ],
+  [
+    'testInvalidPrBranchStrategy',
+    () => {
+      assertActionStepFails({
+        stepName: "Validate 'pr-branch-strategy'",
+        inputs: { 'pr-branch-strategy': 'append' },
+        pattern: /'pr-branch-strategy' must be one of: update, unique, fail/,
+      });
+    },
+  ],
+  [
     'testInvalidPrBase',
     () => {
       assertActionStepFails({
